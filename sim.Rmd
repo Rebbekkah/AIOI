@@ -1,0 +1,206 @@
+---
+title: "Simulations_aiguilles"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Exercice 1
+# avec nb de touche
+
+```{r}
+D = 1
+L = 0.2
+r = L/D
+n = 100
+touche = runif(n, 2, 80)
+p_est = touche/n
+
+estim_pi = function(n, r) {
+  pi_est = (1/p_est)*((2*L)/D)
+  return(pi_est)
+}
+```
+
+```{r}
+estim_pi(n, r) # pour chaque aiguille
+```
+
+# avec les degrés
+
+```{r}
+D = 1
+L = 0.2
+r = L/D
+n = 100
+teta = runif(1, 0, 2*pi)
+```
+
+n = 100
+D = 1
+L = 0.2
+r = L/D
+
+```{r}
+
+estim_pi = function(n, r) {
+ teta = runif(n, 0, 2*pi) 
+ x = runif(n, 0, D)
+ y = x + cos(teta)*r
+ 
+ ns = sum(y > 1 | y < 0)
+ ps = ns/n
+ return(2*r/ps)
+}
+
+print("valeur de l'estimation de pi : ", estim_pi(n = 100, r = 0.3))
+```
+```{r}
+require(MASS)
+```
+```{r}
+#accumuler n rep de pi
+mse_pi = function(n, r, nrep) {
+  pi_est =  rep(NA, nrep) # vecteur de n répétitions
+  
+  for (i in 1:nrep) {
+    pi_est[i] = estim_pi(n, r)
+  }
+  
+  mse = mean((pi_est - pi))**2
+    
+  truehist(pi_est, main = paste("mse = ", round(mse, 6)), xlim = c(0, 6))
+  abline(v = pi, col = "purple")
+
+  return(mse)
+}
+
+mse_pi(n = 100, r = 0.3, nrep = 100000)
+```
+
+
+```{r}
+nrep = 100000
+x = rnorm(nrep)
+truehist(x)
+mean(x) # estimation de l'espérance
+var(x) # estimation de la variance
+quantile(x, probs = c(0.025, 0.975)) # quantile 2.5% et 97.5%
+
+val_X = seq(-4, 4, len = 100)
+val_Y = dnorm(val_X)
+lines(val_X, val_Y, col = "green", lwd = 2)
+
+
+y = x^2
+truehist(y, lim = c(0,7))
+val_X = seq(-4, 4, len = 100)
+val_Y = dchisq(val_X, df = 1)
+lines(val_X, val_Y, col = "red", lwd = 2)
+
+
+x = runif(n = nrep)
+truehist(x)
+y = x^2
+truehist(y)
+lines(val_X, val_Y, col = "blue", lwd = 2)
+
+```
+
+
+```{r}
+x = runif(n = nrep)
+truehist(x)
+y = 2*x - 3
+range(y)
+truehist(y)
+
+val_X = seq(-3, -1, len = 100)
+val_Y = dunif(val_X, -3, -1)
+lines(val_X, val_Y, col = "brown", lwd = 2)
+```
+# Exercice 2
+## 1.
+```{r}
+g = function(x) { 
+  return((exp(x)-1)/(exp(1)-1))
+}
+
+h = integrate(g, lower = 0, upper = 2)
+h # valeur de l'intégrale
+I = (exp(2)-3)/(exp(1)-1)
+I #valeur de I
+print("h = I")
+
+```
+## 2. "tirage blanc ou noir"
+```{r}
+estim_I_bw = function(n) {
+  a = 0
+  b = 2
+  m = g(b) # majorant mais on peut prendre une valeur plus grande (le meilleur choix --> plus petit des majorants
+  
+  u = runif(n, min = 0, max = b) # abscisse aléatoire
+  v = runif(n, min = 0, max = g(b)) # ordonnée aléatoire
+  ns = sum(v < g(u)) # ns = à chaque fois où on est au dessous de la courbe
+  
+  I_estim = m*(b-a)*(ns/n)
+  return(I_estim)
+}
+
+val_x = seq(0, 2, len = 100)
+val_y = g(val_x)
+plot(val_x, val_y, type = "l")
+abline(h = g(2), col = "green")
+
+estim_I_bw(100)
+```
+
+## 3.
+
+```{r}
+estim_I_simple = function(n) {
+  b = 2
+  a = 0
+
+  # échantillonage entre a et b
+  x = runif(n, min = a, max = b)
+  
+  # I = (b-a)(E(X))
+  I_estim = (b-a) * mean(g(x))
+  
+  return(I_estim)
+}
+estim_I_simple(100)
+```
+
+
+
+```{r}
+mse_I_simple = function(n, nrep) {
+  i_hat = rep(NA, times = nrep)
+  for (i in 1:nrep) {
+    i_hat[i] = estim_I_simple(n)
+  }
+  
+  mse = mean((i_hat - I)^2)
+  truehist(i_hat, xlim = c(1,5))
+  abline(v = I, col = "red")
+  title(main = paste("Simple - n = ", "/nmse = ", round(mse, 6)))
+  
+  return(mse)
+
+}
+
+mse_I_simple(100, 100000)
+```
+
+
+
+
+
+
+
+
