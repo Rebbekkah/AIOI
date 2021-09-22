@@ -1,0 +1,200 @@
+---
+title: "Méthodes de transformation"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# 3.
+```{r}
+require(MASS)
+```
+
+
+```{r}
+g = function(x) {
+  return(1/2*exp(-abs(x)))
+}
+
+G = function(g) {
+  
+}
+
+
+my_dlaplace = function(x) {
+  res = rep(NA, times = length(x))
+  negi = (x < 0) # où sont les négatifs
+  res[negi] = exp(x[negi]) / 2.0 # pour les x négatifs, utiliser g(x) = exp(x)/2
+  res[! negi] = exp(-x[!negi]) / 2.0 # pour les x positifs, utiliser g(x) = exp(-x)/2
+  
+  return(res)
+}
+
+
+valx = seq(-4, 4, len = 1000)
+valy = my_dlaplace(valx)
+plot(valx, valy, type = "l")
+
+
+my_plaplace = function(x) {
+  res = rep(NA, times = length(x))
+  negi = (x < 0) # où sont les négatifs
+  res[negi] = 1/2*exp(x[negi]) # pour les x négatifs, utiliser g(x) = exp(x)/2
+  res[! negi] = 1/2*(2-exp(-x[!negi])) # pour les x positifs, utiliser g(x) = exp(-x)/2
+  
+  return(res)
+}
+
+valx = seq(-4, 4, len = 1000)
+valy = my_plaplace(valx)
+plot(valx, valy, type = "l")
+
+my_qlaplace = function(p) {
+
+  res = rep(NA, times = length(p))
+  pos = (p < 1/2) # où sont les p < 1/2
+  res[pos] = log(2*p[pos]) # pour les plus petits que 1/2 , utiliser g(x) = exp(x)/2
+  res[! pos] = -log(2*(1-p[! pos])) # sinon utiliser G(p) = .....
+  
+  
+  return(res)
+}
+
+
+valx = seq(0, 1, len = 1000)
+valy = my_qlaplace(valx)
+plot(valx, valy, type = "l")
+
+
+my_rlaplace = function(n) {
+   u = runif(n)
+   return(my_qlaplace(u))
+}
+
+# tirer des nombres dans la loi de laplace et étudier leur distribution
+res = my_rlaplace(100000)
+truehist(res, xlim = c(-5,5))
+
+# surimposer la densité théorique
+valx = seq(-4, 4, len = 1000)
+valy = my_dlaplace(valx)
+lines(valx, valy, col = "red")
+
+
+```
+# 4.
+
+
+```{r}
+my_rnorm = function(n) {
+  m = sqrt((2*exp(1)/pi))
+  u = runif(length(res))
+  paccept = dnorm(res)/(m*my_dlaplace(res))
+  
+  print(head(paccept))
+
+}
+#my_rnorm(2) # pas bon voir correction trop de valeurs ici
+m = sqrt((2*exp(1)/pi)) #rejet
+
+# m*g(x)
+valx = seq(-4, 4, len = 1000)
+valy = m*my_dlaplace(valx)
+plot(valx, valy, col = "red", type = "l")
+
+#f(x)
+valx = seq(-4, 4, len = 1000)
+valy = dnorm(valx)
+lines(valx, valy, col = "black", type = "l")
+
+
+n = 100
+u = runif(length(res))
+data.frame(res, my_rnorm(n), u)  #data.frame(res, paccept, u)
+
+
+ # pas bon voir correction trop de valeurs ici
+```
+
+
+```{r}
+paccept = dnorm(res)/(m*my_dlaplace(res))
+u = runif(length(res))
+resaccepted = res[paccept > u]
+length(resaccepted)
+truehist(resaccepted)
+valx = seq(-4, 4, len = 1000)
+valy = dnorm(valx)
+lines(valx, valy, col = "orange", type = "l")
+
+```
+# 5.
+MCMC
+f (x) = 0.2 g 1 (x) + 0.5 g 2 (x) + 0.3 g 3 (x)
+• g 1 densité d'une loi normale N (µ = −3, σ = 2)
+• g 2 densité d'une loi normale N (µ = 0, σ = 1)
+• g 3 densité d'une loi normale N (µ = 5, σ = 3)
+
+```{r}
+my_dtarget = function(x) {
+  return(0.2*dnorm(x, mean = -3, sd = 2) +
+           0.5*dnorm(x, mean = 0, sd = 1) +
+           0.5*dnorm(x, mean = 5, sd = 3)) 
+
+}
+
+valx = seq(-10, 10, len = 1000)
+valy = my_dtarget(valx)
+plot(valx, valy, col = "blue", type = "l")
+
+
+#densité de la proposition "(g(y) |x)"
+# y = valeur proposée
+# x = valeur de départ
+dprop = function(y, x) {
+  return(dnorm(y, mean = x, sd = 3)) # 3 arbitrairement
+}
+
+#fonctin random de la proposition : 1 seule proposition renvoyée
+# renvoie une proposition y sachant la valeur de départ x
+rprop = function(x) {
+  y = rnorm(1, mean = x, sd = 3)
+  
+  return(y)
+}
+
+
+#fonction random de la cible par MCMC
+my_rtarget = function(n) {
+  res = rep(NA, times = n)
+  res[1] = -30 # on initialise à la 1ere valeur
+  
+  for (i in 2:n) {
+    y = rprop(res[i-1])
+    p = min(c(1, (my_dtarget(y)/my_dtarget(res[i-1])) * (dprop(res[i-1], y) / dprop(y, res[i-1]))))
+    u = runif(1)
+    
+    if(u < p) { #accepter y
+      res[i] = y
+    }
+    else { # rejeter y
+      res[i] = res[i-1]
+    }
+  }
+  return(res)
+}
+
+my_rtarget(100)
+plot(my_rtarget(100), type = "l")
+```
+
+
+
+
+
+
+
+
