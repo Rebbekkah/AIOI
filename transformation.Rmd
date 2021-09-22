@@ -187,8 +187,17 @@ my_rtarget = function(n) {
   return(res)
 }
 
-my_rtarget(100)
-plot(my_rtarget(100), type = "l")
+x = my_rtarget(100000)
+plot(x, type = "l")
+
+truehist(x, xlim = c(-15,15))
+
+
+valx = seq(-10, 15, len = 1000)
+valy = my_dtarget(valx)
+lines(valx, valy, col = "black", type = "l")
+
+
 ```
 
 
