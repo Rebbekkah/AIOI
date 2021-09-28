@@ -1,0 +1,307 @@
+---
+title: "M2BI Projet Simulations Biologiques"
+author: "Goulancourt Rebecca & Jamay Théo"
+date: "28/09/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+require(MASS)
+```
+
+
+# Exercice 2
+
+http://www.tangentex.com/MonteCarlo.htm
+
+On doit déterminer l'aire sous la courbe de la fonction g
+sur l'intervalle [0, 2]
+grâce aux méthodes d'intégration Monte Carlo --> méthode de calcul d'intégrale par échantillonage  sur une surface
+on veut comparer les différentes méthodes d'intégration : Monte Carlo par tirage "noir ou blanc", Monte Carlo simple et Monte Carlo suivant l'importance 
+
+
+## 1. Intégration analytique
+
+```{r}
+# Définition de la fonction étudiée
+g = function(x) { 
+  return((exp(x)-1)/(exp(1)-1))
+}
+```
+
+```{r}
+h = integrate(g, lower = 0, upper = 2)
+h # valeur de l'intégrale de g
+I = (exp(2)-3)/(exp(1)-1)
+I # valeur de I
+print("Les valeurs de h et I sont égales")
+```
+## 2. "tirage blanc ou noir"
+
+On pioche une valeur aléatoire de coordonnée {x,y} dans l'intervalle [a,b]
+on regarde si cette valeur est en dessous ou au dessus de la courbe
+si oui alors on fait la somme des points sous la courbe pour calculer l'intégrale
+
+```{r}
+estim_I_bw = function(n) { # n = nb de points sur la courbe 
+  a = 0
+  b = 2
+  m = g(b) # majorant mais on peut prendre une valeur plus grande (le meilleur choix --> plus petit des majorants
+  
+  u = runif(n, min = 0, max = b) # abscisse aléatoire
+  v = runif(n, min = 0, max = g(b)) # ordonnée aléatoire
+  ns = sum(v < g(u)) # ns = à chaque fois où on est au dessous de la courbe
+  
+  I_estim = m*(b-a)*(ns/n) # Calcul de l'intégrale
+  return(I_estim)
+}
+
+val_x = seq(0, 2, len = 100)
+val_y = g(val_x)
+plot(val_x, val_y, type = "l")
+abline(h = g(2), col = "green")
+
+I_bw <- estim_I_bw(100)
+I_bw
+```
+
+mse = mean square error = erreur quadratique moyenne = mesure de la qualité de l'estimateur --> mesure de sa précision
+
+```{r}
+mse_I_bw = function(n, nrep) {
+  i_hat = rep(NA, times = nrep)
+  for (i in 1:nrep) {
+    i_hat[i] = estim_I_bw(n)
+  }
+  
+  mse = mean((i_hat - I)^2)
+  truehist(i_hat, xlim = c(1,5))
+  abline(v = I, col = "red")
+  title(main = paste("bw - n = ", "/nmse = ", round(mse, 6)), sub = "mean square error histogram")
+  
+  return(mse)
+
+}
+
+mse_I_bw <- mse_I_bw(100, 100000)
+mse_I_bw
+```
+
+
+## 3.
+
+on divise l'aire sous la courbe en n rectangles adjacents 
+on calcule la somme de l'aire de ces n rectangles = aire sous la courbe 
+
+
+```{r}
+estim_I_simple = function(n) {
+  b = 2
+  a = 0
+
+  # échantillonage entre a et b
+  x = runif(n, min = a, max = b)
+  
+  # calcul de l'aire sachant que I = (b-a)(E(X))
+  I_estim = (b-a) * mean(g(x))
+  
+  return(I_estim)
+}
+I_simple <- estim_I_simple(100)
+I_simple
+```
+```{r}
+mse_I_simple = function(n, nrep) {
+  i_hat = rep(NA, times = nrep)
+  for (i in 1:nrep) {
+    i_hat[i] = estim_I_simple(n)
+  }
+  
+  mse = mean((i_hat - I)^2)
+  truehist(i_hat, xlim = c(1,5))
+  abline(v = I, col = "red")
+  title(main = paste("Simple - n = ", "/nmse = ", round(mse, 6)))
+  
+  return(mse)
+
+}
+
+mse_I_simple <- mse_I_simple(100, 100000)
+mse_I_simple
+```
+
+
+
+## 4.
+
+certaines valeurs prises par une variable aléatoire dans une simulation ont plus d'effet que d'autres sur l'estimateur recherché. Si ces valeurs importantes se réalisent plus souvent, la variance de notre estimateur peut être réduite et donc augmenter sa qualité
+
+simulation loi beta de paramètre (2, 1):
+
+```{r}
+n = 100000
+x = rbeta(n, shape1 = 2, shape2 = 1) # la variable aléatoire X suit une loi beta(2, 1)
+truehist(x)
+
+# Densité de x
+valx = seq(0, 1, len = 1000)
+valy = dbeta(valx, shape1 = 2, shape2 = 1)
+lines(valx, valy, col = "blue")
+```
+
+
+fonction de la variable x
+Y = 2*x
+--> pour d'adapter au support (intervalle) de base
+
+```{r}
+y = 2*x
+round(range(y), 5)
+
+truehist(y)
+
+# nouvelle densité (densité de y)
+dy = function(y) {
+  return(1/2 * dbeta(y/2, shape1 = 2, shape2 = 1))
+}
+
+# plot de la nouvelle densité
+valx = seq(0, 2, len = 1000)
+valy = dy(valx)
+lines(valx, valy, col = "blue")
+```
+
+```{r}
+# "nouvelle" fonction random pour la variable Y
+ry = function(n) {
+  return(2 * rbeta(n, shape1 = 2, shape2 = 1))
+}
+```
+
+I = E[h(y)] = E[g(y)/fy(y)]
+E[] --> fonction R mean() 
+g --> fonction R g...
+fy --> densité de y --> fonction R dy
+Y --> série de valeurs tirées dans la loi de y --> ry
+
+```{r}
+
+# brouillon ?
+
+h = function(y) {
+  I = mean(g(y)/dy(y))
+  return(I)
+}
+```
+
+```{r}
+estim_I_importance = function(n) {
+  y = ry(n)
+  I_estim = mean(g(y)/dy(y))
+  
+  return(I_estim)
+}
+
+I_importance <- estim_I_importance(10000000) # Une seule estimation de I par la méthode d'échantillonnage par importance 
+I_importance
+```
+
+```{r}
+I = (exp(2)-3)/(exp(1)-1)
+mse_I_importance = function(n, nrep) {
+  i_hat = rep(NA, times = nrep)
+  for (i in 1:nrep) {
+    i_hat[i] = estim_I_importance(n)
+  }
+  mse = mean((i_hat - I)^2)
+
+  truehist(i_hat, lim = c(1,5))
+  abline(v = I, col = "red")
+  title(main = paste("Simple - n = ", "/nmse = ", round(mse, 6)))
+  
+  
+  return(mse)
+  
+  }
+
+mse_I_importance <- mse_I_importance(n = 100, nrep = 1000) 
+mse_I_importance
+```
+
+
+## 5.
+
+```{r}
+y = 2*x
+round(range(y), 5)
+
+truehist(y)
+
+# nouvelle densité (densité de y)
+dy = function(y) {
+  return(1/2 * dbeta(y/2, shape1 = 2, shape2 = 1))
+}
+
+# plot de la nouvelle densité
+valx = seq(0, 2, len = 1000)
+valy = dy(valx)
+lines(valx, valy, col = "blue")
+```
+
+
+## 6.
+
+graphe + commentaire et montrer pq et comment on améliore le mse
+
+
+```{r}
+df <- data.frame(
+  I_bw = I_bw,
+  mse_I_bw = mse_I_bw,
+  I_simple = I_simple,
+  mse_I_simple = mse_I_simple,
+  I_importance = I_importance,
+  mse_I_importance = mse_I_importance,
+  stringsAsFactors = FALSE
+)
+df
+```
+
+
+# Exercice 3
+
+Loi de poisson : loi des petits échantillons et événements rares
+
+X suit P(lambda) où lambda = proba d'apparition 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
