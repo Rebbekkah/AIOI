@@ -1,0 +1,616 @@
+---
+title: "M2BI Projet Simulations Biologiques"
+author: "Goulancourt Rebecca, Jamay Théo & Ren Yani"
+date: "28/09/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+require(MASS)
+```
+
+# Exercice 2
+
+http://www.tangentex.com/MonteCarlo.htm
+
+On doit déterminer l'aire sous la courbe de la fonction g
+sur l'intervalle [0, 2]
+grâce aux méthodes d'intégration Monte Carlo --> méthode de calcul d'intégrale par échantillonage  sur une surface
+on veut comparer les différentes méthodes d'intégration : Monte Carlo par tirage "noir ou blanc", Monte Carlo simple et Monte Carlo suivant l'importance 
+
+
+## 1. Intégration analytique
+
+```{r}
+# Définition de la fonction étudiée
+g = function(x) { 
+  return((exp(x)-1)/(exp(1)-1))
+}
+```
+
+```{r}
+h = integrate(g, lower = 0, upper = 2)
+h # valeur de l'intégrale de g
+I = (exp(2)-3)/(exp(1)-1)
+I # valeur de I
+print("Les valeurs de h et I sont égales")
+```
+## 2. "tirage blanc ou noir"
+
+On pioche une valeur aléatoire de coordonnée {x,y} dans l'intervalle [a,b]
+on regarde si cette valeur est en dessous ou au dessus de la courbe
+si oui alors on fait la somme des points sous la courbe pour calculer l'intégrale
+
+```{r}
+estim_I_bw = function(n) { # n = nb de points sur la courbe 
+  a = 0
+  b = 2
+  m = g(b) # majorant mais on peut prendre une valeur plus grande (le meilleur choix --> plus petit des majorants
+  
+  u = runif(n, min = 0, max = b) # abscisse aléatoire
+  v = runif(n, min = 0, max = g(b)) # ordonnée aléatoire
+  ns = sum(v < g(u)) # ns = à chaque fois où on est au dessous de la courbe
+  
+  I_estim = m*(b-a)*(ns/n) # Calcul de l'intégrale
+  return(I_estim)
+}
+
+val_x = seq(0, 2, len = 100)
+val_y = g(val_x)
+plot(val_x, val_y, type = "l")
+abline(h = g(2), col = "green")
+
+I_bw <- estim_I_bw(100)
+I_bw
+```
+
+mse = mean square error = erreur quadratique moyenne = mesure de la qualité de l'estimateur --> mesure de sa précision
+
+```{r}
+mse_I_bw = function(n, nrep) {
+  i_hat = rep(NA, times = nrep)
+  for (i in 1:nrep) {
+    i_hat[i] = estim_I_bw(n)
+  }
+  
+  mse = mean((i_hat - I)^2)
+  truehist(i_hat, xlim = c(1,5)) # truehist() fabrique un histogramme sous forme de densité
+  abline(v = I, col = "red")
+  title(main = paste("bw - n = ", "/nmse = ", round(mse, 6)), sub = "mean square error histogram")
+  
+  return(mse)
+
+}
+
+mse_I_bw <- mse_I_bw(100, 100000)
+mse_I_bw
+```
+
+
+## 3.
+
+on divise l'aire sous la courbe en n rectangles adjacents 
+on calcule la somme de l'aire de ces n rectangles = aire sous la courbe 
+
+
+```{r}
+estim_I_simple = function(n) {
+  b = 2
+  a = 0
+
+  # échantillonage entre a et b
+  x = runif(n, min = a, max = b)
+  
+  # calcul de l'aire sachant que I = (b-a)(E(X))
+  I_estim = (b-a) * mean(g(x))
+  
+  return(I_estim)
+}
+I_simple <- estim_I_simple(100)
+I_simple
+```
+```{r}
+mse_I_simple = function(n, nrep) {
+  i_hat = rep(NA, times = nrep)
+  for (i in 1:nrep) {
+    i_hat[i] = estim_I_simple(n)
+  }
+  
+  mse = mean((i_hat - I)^2)
+  truehist(i_hat, xlim = c(1,5))
+  abline(v = I, col = "red")
+  title(main = paste("Simple - n = ", "/nmse = ", round(mse, 6)))
+  
+  return(mse)
+
+}
+
+mse_I_simple <- mse_I_simple(100, 100000)
+mse_I_simple
+```
+
+
+
+## 4.
+
+certaines valeurs prises par une variable aléatoire dans une simulation ont plus d'effet que d'autres sur l'estimateur recherché. Si ces valeurs importantes se réalisent plus souvent, la variance de notre estimateur peut être réduite et donc augmenter sa qualité
+
+simulation loi beta de paramètre (2, 1):
+
+```{r}
+n = 100000
+x = rbeta(n, shape1 = 2, shape2 = 1) # la variable aléatoire X suit une loi beta(2, 1)
+truehist(x)
+
+# Densité de x
+valx = seq(0, 1, len = 1000)
+valy = dbeta(valx, shape1 = 2, shape2 = 1)
+lines(valx, valy, col = "blue")
+```
+
+
+fonction de la variable x
+Y = 2*x
+--> pour d'adapter au support (intervalle) de base
+
+```{r}
+y = 2*x
+round(range(y), 5)
+
+truehist(y)
+
+# nouvelle densité (densité de y)
+dy = function(y) {
+  return(1/2 * dbeta(y/2, shape1 = 2, shape2 = 1))
+}
+
+# plot de la nouvelle densité
+valx = seq(0, 2, len = 1000)
+valy = dy(valx)
+lines(valx, valy, col = "blue")
+```
+
+```{r}
+# "nouvelle" fonction random pour la variable Y
+ry = function(n) {
+  return(2 * rbeta(n, shape1 = 2, shape2 = 1))
+}
+```
+
+I = E[h(y)] = E[g(y)/fy(y)]
+E[] --> fonction R mean() 
+g --> fonction R g...
+fy --> densité de y --> fonction R dy
+Y --> série de valeurs tirées dans la loi de y --> ry
+
+```{r}
+
+# brouillon ?
+
+h = function(y) {
+  I = mean(g(y)/dy(y))
+  return(I)
+}
+```
+
+```{r}
+estim_I_importance = function(n) {
+  y = ry(n)
+  I_estim = mean(g(y)/dy(y))
+  
+  return(I_estim)
+}
+
+I_importance <- estim_I_importance(10000000) # Une seule estimation de I par la méthode d'échantillonnage par importance 
+I_importance
+```
+
+```{r}
+I = (exp(2)-3)/(exp(1)-1)
+mse_I_importance = function(n, nrep) {
+  i_hat = rep(NA, times = nrep)
+  for (i in 1:nrep) {
+    i_hat[i] = estim_I_importance(n)
+  }
+  mse = mean((i_hat - I)^2)
+
+  truehist(i_hat, lim = c(1,5))
+  abline(v = I, col = "red")
+  title(main = paste("Simple - n = ", "/nmse = ", round(mse, 6)))
+  
+  
+  return(mse)
+  
+  }
+
+mse_I_importance <- mse_I_importance(n = 100, nrep = 1000) 
+mse_I_importance
+```
+
+
+## 5.
+
+```{r}
+y = 2*x
+round(range(y), 5)
+
+truehist(y)
+
+# nouvelle densité (densité de y)
+dy = function(y) {
+  return(1/2 * dbeta(y/2, shape1 = 2, shape2 = 1))
+}
+
+# plot de la nouvelle densité
+valx = seq(0, 2, len = 1000)
+valy = dy(valx)
+lines(valx, valy, col = "blue")
+```
+
+
+## 6.
+
+graphe + commentaire et montrer pq et comment on améliore le mse
+
+
+```{r}
+df <- data.frame(
+  I_bw = I_bw,
+  mse_I_bw = mse_I_bw,
+  I_simple = I_simple,
+  mse_I_simple = mse_I_simple,
+  I_importance = I_importance,
+  mse_I_importance = mse_I_importance,
+  stringsAsFactors = FALSE
+)
+df
+```
+
+
+# Exercice 3
+
+Loi de poisson : loi des petits échantillons et événements rares
+
+X suit P(lambda) où lambda = proba d'apparition 
+
+détailler calcul de p(k) (wikipédia)
+
+On cherche à implémenter une fonction pour une variable suivant une loi de poisson en utilisant une méthode d'inversion de la fonction de répartition
+
+fonction de répartition : fonction de cumulation des probabilités prises pour chaque valeurs --> permet de retrouver la proba d'une valeur
+mettre formule + graphe fonction de répartition
+
+Récirproque de la fonction de répatition (ou méthode de la transformée inverse) --> fonction quantile : moyen de décrire la dispersion d'une loi et de trouver faiclement la valeur des quantiles 
+définir quantiles et à quoi moyenne mediane ect correspondent
+La fonction quantile d'une variable aléatoire discrète est une fonction en escalier, comme la fonction de répartition.
+mettre formule 
+
+X discrète != X continue
+
+
+```{r}
+my_rpois_one = function(n) {
+  u = runif(1)
+  x = 0 
+  while(u > ppois(x, lambda = n)) {
+    x = x + 1
+  }
+  return(x)
+}  
+
+my_rpois_one(3.14)
+```
+accumulation
+```{r}
+my_rpois = function(n, lambda) {
+  vec = rep(NA, length = n)
+  
+  for (i in 1:n) {
+    vec[i] = my_rpois_one(n = lambda) # voir la fonction replicate pour éviter boucle for
+  }
+  return(vec)
+}
+
+
+n = 10000 # nb de nb aléatoire à tirer
+# paramètre de la loi de poisson :
+lambda = 3.14
+x = my_rpois(n = n, lambda = lambda) # les tirer
+plot(table(x)/n, type = "h") # diagramme baton (frequences)
+mean(x) # on s'attends à proche de lambda
+var(x) # on s'attends à proche de lambda
+
+#vérifier les proportions observées
+valx = 0:12
+valy = dpois(valx, lambda = lambda)
+points(valx, valy, col = "brown", pch = 19)
+
+```
+
+
+# 2.
+
+On sait que X suit loi de probabilité à mettre
+on cherche à simuler X --> va réelle discrète
+
+```{r}
+valx = seq(from = min(x), to = max(x), by = 1)
+valy = dpois(valx, lambda = lambda)
+
+x = c(-3, 1.3, 7, 15.2)
+px = c(0.1, 0.4, 0.3, 0.2)
+valrep_i = cumsum(px)
+
+
+my_rdiscret_one = function() { # renvoie une valeur prise par X
+
+  # il faut parcourir x dans le support (x[1], x[2], .... x[i])
+  # condition d'arret : u <= pX(xi)
+  
+  u = runif(1)
+  i = 1 
+  while(u > valrep_i[i]) {
+    i = i + 1
+  }
+    return(x[i])
+}
+
+my_rdiscret_one()
+```
+
+```{r}
+my_rdiscret = function(n, lambda) {
+  vec = rep(NA, length = n)
+  
+  for (i in 1:n) {
+    vec[i] = my_rdiscret_one() 
+  }
+  return(vec) # vecteur contenant les valeurs prise par X
+}
+my_rdiscret(100, 2)
+```
+# 3. Méthode de transformation
+
+on cherche à simuler une v.a suivant une loi de laplace grâce à la méthode d'inversion citée plus-haut.
+
+mettre fonction de densité
+
+
+```{r}
+# Fonction de densité d'une variable suivant une loi de Laplace
+my_dlaplace = function(x) {
+  res = rep(NA, times = length(x))
+  negi = (x < 0) # où sont les négatifs
+  res[negi] = exp(x[negi]) / 2.0 # pour les x négatifs, utiliser g(x) = exp(x)/2
+  res[! negi] = exp(-x[!negi]) / 2.0 # pour les x positifs, utiliser g(x) = exp(-x)/2
+  
+  return(res)
+}
+
+
+valx = seq(-4, 4, len = 1000)
+valy = my_dlaplace(valx)
+plot(valx, valy, type = "l")
+
+# Fonction de répartition d'une variable suivant une loi de Laplace
+my_plaplace = function(x) {
+  res = rep(NA, times = length(x))
+  negi = (x < 0) # où sont les négatifs
+  res[negi] = 1/2*exp(x[negi]) # pour les x négatifs, utiliser g(x) = exp(x)/2
+  res[! negi] = 1/2*(2-exp(-x[!negi])) # pour les x positifs, utiliser g(x) = exp(-x)/2
+  
+  return(res)
+}
+
+valx = seq(-4, 4, len = 1000)
+valy = my_plaplace(valx)
+plot(valx, valy, type = "l")
+
+# Fonction quantile d'une variable suivant une loi de Laplace
+my_qlaplace = function(p) {
+  res = rep(NA, times = length(p))
+  pos = (p < 1/2) # où sont les p < 1/2
+  res[pos] = log(2*p[pos]) # pour les plus petits que 1/2 , utiliser g(x) = exp(x)/2
+  res[! pos] = -log(2*(1-p[! pos])) # sinon utiliser G(p) = .....
+  
+  return(res)
+}
+
+
+valx = seq(0, 1, len = 1000)
+valy = my_qlaplace(valx)
+plot(valx, valy, type = "l")
+
+
+my_rlaplace = function(n) {
+   u = runif(n)
+   return(my_qlaplace(u))
+}
+
+# tirer des nombres dans la loi de laplace et étudier leur distribution
+res = my_rlaplace(100000)
+truehist(res, xlim = c(-5,5))
+
+# surimposer la densité théorique
+valx = seq(-4, 4, len = 1000)
+valy = my_dlaplace(valx)
+lines(valx, valy, col = "red")
+
+
+```
+# 4. Méthode de rejet
+
+à l'aide de la même méthode utilisée pour l'implémentation de Laplace, on veut implémenter une fonction simulant une variable suivant une loi normale centée réduit : X ~ N(0,1).
+rappeler loi de proba d'une va suivant loi normale centrée réduite 
+
+
+my_rnorm = function(n) {
+  m = sqrt((2*exp(1)/pi))
+  u = runif(length(res))
+  paccept = dnorm(res)/(m*my_dlaplace(res))
+  
+  print(head(paccept))
+
+}
+my_rnorm(2) # pas bon voir correction trop de valeurs ici
+
+
+m = sqrt((2*exp(1)/pi)) # méthode du rejet
+
+plot de m*g(x)
+valx = seq(-4, 4, len = 1000)
+valy = m*my_dlaplace(valx)
+plot(valx, valy, col = "red", type = "l")
+
+plot de f(x)
+valx = seq(-4, 4, len = 1000)
+valy = dnorm(valx)
+lines(valx, valy, col = "black", type = "l")
+
+
+n = 100
+u = runif(length(res))
+data.frame(res, my_rnorm(n), u)  #data.frame(res, paccept, u)
+
+
+ # pas bon voir correction trop de valeurs ici
+
+```{r}
+# Méthode du REJET
+m <- sqrt((2*exp(1))/pi)  # le meilleur de majorant
+
+# m*g(x)
+val_x <- seq(from = -4, to = 4, len = 1000)
+val_y <- m*my_dlaplace(val_x)
+plot(val_x, val_y, type = "l")
+
+# f(x)
+val_x <- seq(from = -4, to = 4, len = 1000)
+val_y <- dnorm(val_x)
+lines(val_x, val_y, col = "red")
+```
+
+
+```{r}
+paccept = dnorm(res)/(m*my_dlaplace(res))
+u = runif(length(res))
+resaccepted = res[paccept > u]
+length(resaccepted)
+truehist(res, xlim = c(-5, 5)) # avant rejet 
+truehist(resaccepted, xlim = c(-5, 5)) # après rejet
+valx = seq(-4, 4, len = 1000)
+valy = dnorm(valx)
+lines(valx, valy, col = "orange", type = "l")
+
+```
+
+# 5. Algorithme MCMC
+
+MCMC = algorithme Monte Carlo Markov Chain
+mcmc = algo stochastique (aléatoire) permettant de simuler une distribution 
+
+on veut simuler une va aléatoire X définie par :
+
+f (x) = 0.2 g 1 (x) + 0.5 g 2 (x) + 0.3 g 3 (x)
+• g 1 densité d'une loi normale N (µ = −3, σ = 2)
+• g 2 densité d'une loi normale N (µ = 0, σ = 1)
+• g 3 densité d'une loi normale N (µ = 5, σ = 3)
+
+```{r}
+my_dtarget = function(x) {
+  return(0.2*dnorm(x, mean = -3, sd = 2) + #g1
+           0.5*dnorm(x, mean = 0, sd = 1) + #g2
+           0.5*dnorm(x, mean = 5, sd = 3)) #g3
+
+}
+
+valx = seq(-10, 15, len = 1000)
+valy = my_dtarget(valx)
+plot(valx, valy, col = "blue", type = "l")
+
+
+#densité de la proposition "(g(y) |x)"
+# y = valeur proposée
+# x = valeur de départ
+dprop = function(y, x) {
+  return(dnorm(y, mean = x, sd = 3)) # 3 arbitrairement
+}
+
+#fonctin random de la proposition : 1 seule proposition renvoyée
+# renvoie une proposition y sachant la valeur de départ x
+rprop = function(x) {
+  y = rnorm(1, mean = x, sd = 3)
+  
+  return(y)
+}
+
+
+#fonction random de la cible par MCMC
+my_rtarget = function(n) {
+  res = rep(NA, times = n)
+  res[1] = -30 # on initialise à la 1ere valeur
+  
+  for (i in 2:n) {
+    y = rprop(res[i-1])
+    p = min(c(1, (my_dtarget(y)/my_dtarget(res[i-1])) * (dprop(res[i-1], y) / dprop(y, res[i-1]))))
+    u = runif(1)
+    
+    if(u < p) { # accepter y
+      res[i] = y
+    }
+    else { # rejeter y
+      res[i] = res[i-1]
+    }
+  }
+  return(res)
+}
+
+# simulations
+x = my_rtarget(1000)
+plot(x, type = "l")
+
+# densité des valeurs simulées
+truehist(x, xlim = c(-15,15))
+
+
+valx = seq(-10, 15, len = 1000)
+valy = my_dtarget(valx) #densité cible
+lines(valx, valy, col = "black", type = "l")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
